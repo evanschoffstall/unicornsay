@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Function to display the unicorn with a message with word wrapping
+# Function to display the unicorn with a message in a table format
 unicornsay() {
   local message="$1"
   local wrapped_message
@@ -8,7 +8,7 @@ unicornsay() {
 
   # Get the terminal width
   local terminal_width=$(tput cols)
-  local wrap_width=$((terminal_width - 6)) # Adjust for padding
+  local wrap_width=$((terminal_width - 8)) # Adjust for padding
 
   # Replace tabs with spaces
   message=$(echo "$message" | sed 's/\t/    /g')
@@ -16,21 +16,20 @@ unicornsay() {
   # Wrap text at the terminal width, ensuring consistent spacing
   wrapped_message=$(echo "$message" | fold -s -w "$wrap_width" | sed 's/[[:space:]]*$//')
   length=$(echo "$wrapped_message" | awk '{if (length > max) max = length} END {print max}')
-  local border_length=$((length + 4)) # Padding for aesthetics
-  local border_top="$(printf '%*s' "$border_length" '' | tr ' ' '-')"
+  local border_length=$((length + 6)) # Padding for aesthetics
+  local border_top="$(printf '─%.0s' $(seq 1 $border_length))"
 
-  # Print chat bubble
-  echo "  $border_top"
+  # Print message in table format
+  echo "┌$border_top┐"
+  printf "│   %-*s   │\n" "$length"
   echo "$wrapped_message" | while IFS= read -r line; do
-    printf " < %-*s >\n" "$length" "$line"
+    printf "│   %-*s   │\n" "$length" "$line"
   done
-  echo "  $border_top"
+  printf "│   %-*s   │\n" "$length"
+  echo "└$border_top┘"
 
   # Print unicorn ASCII art
   cat <<'EOF'
-              \     
-               \   
-                \      
                ,.. /
              ,'   ';
   ,,.__    _,' /';  .
@@ -54,6 +53,9 @@ else
   exit 1
 fi
 
-# Trim leading/trailing spaces and call the function
-input=$(echo "$input" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+# Convert ANSI escape sequences to plain text
+if command -v ansi2txt &>/dev/null; then
+  input=$(echo "$input" | ansi2txt)
+fi
+
 unicornsay "$input"
