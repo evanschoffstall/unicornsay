@@ -6,8 +6,11 @@ unicornsay() {
   local wrapped_message
   local length
 
-  # Wrap text at 40 characters per line
-  wrapped_message=$(echo "$message" | fold -s -w 40)
+  # Replace tabs with spaces
+  message=$(echo "$message" | sed 's/\t/    /g')
+
+  # Wrap text at 40 characters per line, ensuring consistent spacing
+  wrapped_message=$(echo "$message" | fold -s -w 40 | sed 's/[[:space:]]*$//')
   length=$(echo "$wrapped_message" | awk '{if (length > max) max = length} END {print max}')
   local border_length=$((length + 4)) # Padding for aesthetics
   local border_top="$(printf '%*s' "$border_length" '' | tr ' ' '-')"
@@ -21,9 +24,9 @@ unicornsay() {
 
   # Print unicorn ASCII art
   cat <<'EOF'
-             \     
-              \   
-               \
+     \     
+      \   
+        \      
                ,.. /
              ,'   ';
   ,,.__    _,' /';  .
@@ -47,5 +50,6 @@ else
   exit 1
 fi
 
-# Call the function
+# Trim leading/trailing spaces and call the function
+input=$(echo "$input" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 unicornsay "$input"
