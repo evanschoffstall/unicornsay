@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# Function to display the unicorn with a message in a table format
-unicornsay() {
+message_bubble() {
   local message="$1"
+  local offset="${2:-0}"
   local wrapped_message
   local length
 
   # Get the terminal width
   local terminal_width=$(tput cols)
-  local wrap_width=$((terminal_width - 8)) # Adjust for padding
+  local wrap_width=$(((terminal_width - 7) - $offset)) # Adjust for padding
 
   # Replace tabs with spaces
   message=$(echo "$message" | sed 's/\t/    /g')
@@ -27,29 +27,85 @@ unicornsay() {
   done
   printf "│   %-*s   │\n" "$length"
   echo "└$border_top┘"
+}
 
-  # Print unicorn ASCII art
+# Print the unicorn ASCII art
+unicorn_art() {
   cat <<'EOF'
-               ,.. /
-             ,'   ';
-  ,,.__    _,' /';  .
- :','  ~~~~    '. '`
- :' (   )         )::,
- '. '. .=----=..-~  .;'
-  '  ;'  ::   ':.  '
-    (:   ':    ;)
-     \   '"  ./
-      '"      '"
+                ,.. /        
+              ,'   ';        
+   ,,.__    _,' /';  .       
+  :','  ~~~~    '. '`        
+  :' (   )         )::,      
+  '. '. .=----=..-~  .;'     
+   '  ;'  ::   ':.  '        
+     (:   ':    ;)           
+      \   '"  ./             
+       '"      '"            
 EOF
 }
 
-# Read input from pipe or argument
+# Function to handle printing logic
+print_message() {
+  local message="$1"
+  local tcols=$(tput cols)
+  local unicorn_art=$(unicorn_art)
+
+  if [ "$force_above" = true ] || [ "$tcols" -lt 60 ]; then
+    # Display message bubble above the unicorn
+    message_bubble "$message"
+    unicorn_art
+  else
+    # Display message bubble beside the unicorn
+    message=$(message_bubble "$message" 30)
+
+    # count how many lines after line 10
+    line_number=0
+    new_lines=0
+    while IFS= read -r line; do
+      line_number=$((line_number + 1))
+      if [ $line_number -gt 10 ]; then
+        new_lines=$((new_lines + 1))
+      fi
+    done <<<"$message"
+
+    rounded_lines=$((new_lines / 2))
+
+    # center the unicorn and keep the message bubble to the right
+    if [ $new_lines -gt 0 ]; then
+      for i in $(seq 1 $rounded_lines); do
+        unicorn_art=$(printf "                             \n$unicorn_art")
+        unicorn_art=$(printf "$unicorn_art\n                             ")
+      done
+    fi
+    unicorn_art=$(printf "$unicorn_art\n                             ")
+
+    paste -d '' <(echo "$unicorn_art") <(echo "$message")
+  fi
+}
+
+# Parse arguments
+force_above=false
+input=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --above)
+    force_above=true
+    shift
+    ;;
+  *)
+    input="$1"
+    shift
+    ;;
+  esac
+done
+
+# Read input from pipe if available
 if [ -p /dev/stdin ]; then
   input=$(cat)
-elif [ -n "$1" ]; then
-  input="$1"
-else
-  echo "Usage: $0 \"message\" or echo 'message' | $0"
+elif [ -z "$input" ]; then
+  echo "Usage: $0 [--above] \"message\" or echo 'message' | $0 [--above]"
   exit 1
 fi
 
@@ -58,4 +114,4 @@ if command -v ansi2txt &>/dev/null; then
   input=$(echo "$input" | ansi2txt)
 fi
 
-unicornsay "$input"
+print_message "$input"
