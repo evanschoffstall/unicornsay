@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Function to display the unicorn with a message with word wrapping
+unicornsay() {
+  local message="$1"
+  local wrapped_message
+  local length
+
+  # Wrap text at 40 characters per line
+  wrapped_message=$(echo "$message" | fold -s -w 40)
+  length=$(echo "$wrapped_message" | awk '{if (length > max) max = length} END {print max}')
+  local border_length=$((length + 4)) # Padding for aesthetics
+  local border_top="$(printf '%*s' "$border_length" '' | tr ' ' '-')"
+
+  # Print chat bubble
+  echo "  $border_top"
+  echo "$wrapped_message" | while IFS= read -r line; do
+    printf " < %-*s >\n" "$length" "$line"
+  done
+  echo "  $border_top"
+
+  # Print unicorn ASCII art
+  cat <<'EOF'
+             \     
+              \   
+               \
+               ,.. /
+             ,'   ';
+  ,,.__    _,' /';  .
+ :','  ~~~~    '. '`
+ :' (   )         )::,
+ '. '. .=----=..-~  .;'
+  '  ;'  ::   ':.  '
+    (:   ':    ;)
+     \   '"  ./
+      '"      '"
+EOF
+}
+
+# Read input from pipe or argument
+if [ -p /dev/stdin ]; then
+  input=$(cat)
+elif [ -n "$1" ]; then
+  input="$1"
+else
+  echo "Usage: $0 \"message\" or echo 'message' | $0"
+  exit 1
+fi
+
+# Call the function
+unicornsay "$input"

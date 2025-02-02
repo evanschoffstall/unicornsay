@@ -1,0 +1,7 @@
+# Ignore everything
+*
+
+# Whitelist specific files and directories
+!.gitignore
+!unicornsay
+!path/to/other/file_or_directory
