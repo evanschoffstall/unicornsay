@@ -164,24 +164,15 @@ message_bubble() {
   local wrap_width=$((terminal_width - 9 - offset))
   [ $wrap_width -lt 1 ] && wrap_width=1
 
-  # Simple word-wrap using Bash
-  local words line current_line=""
-  IFS=' ' read -ra words <<<"$message"
-  for word in "${words[@]}"; do
-    if [ $((${#current_line} + ${#word} + 1)) -gt $wrap_width ]; then
-      line+="$current_line"$'\n'
-      current_line="$word"
-    else
-      [ -z "$current_line" ] && current_line="$word" || current_line+=" $word"
-    fi
-  done
-  line+="$current_line"
+  # Use fold for word wrapping
+  local wrapped_message
+  wrapped_message=$(echo "$message" | fold -s -w $wrap_width)
 
   # Find max line length in one pass
   local length=0
   while IFS= read -r wrapped_line; do
     ((${#wrapped_line} > length)) && length=${#wrapped_line}
-  done <<<"$line"
+  done <<<"$wrapped_message"
 
   # Build border line
   local border_length=$((length + 6))
@@ -194,7 +185,7 @@ message_bubble() {
     printf "│   %-*s   │\n" "$length" ""
     while IFS= read -r wm; do
       printf "│   %-*s   │\n" "$length" "$wm"
-    done <<<"$line"
+    done <<<"$wrapped_message"
     printf "│   %-*s   │\n" "$length" ""
     echo "└${border_chars}┘"
   }
