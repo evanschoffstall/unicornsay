@@ -1,32 +1,61 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#
+# Unicorn Chat
+# Prints a message inside a bubble next to (or above) a unicorn ASCII art.
+# Usage:
+#   ./unicorn_chat.sh [--above] "Your message here"
+#   echo "Your message here" | ./unicorn_chat.sh [--above]
 
-# Function to create a message bubble
-message_bubble() {
-  local message="$1"
-  local offset="${2:-0}"
-  local wrapped_message length
+###############################################################################
+# Constants / Configuration
+###############################################################################
 
-  local terminal_width=$(tput cols)
-  local wrap_width=$(((terminal_width - 7) - offset))
+# Adjust if needed for advanced usage
+REQUIRED_COMMANDS=("tput" "fold")
 
-  message=$(echo "$message" | sed 's/\t/    /g')
-  wrapped_message=$(echo "$message" | fold -s -w "$wrap_width" | sed 's/[[:space:]]*$//')
-  length=$(echo "$wrapped_message" | awk '{if (length > max) max = length} END {print max}')
-  local border_length=$((length + 6))
-  local border_top="$(printf '─%.0s' $(seq 1 $border_length))"
-
-  # Print message bubble
-  print_border "top" "$border_top"
-  print_empty_line "$length"
-  echo "$wrapped_message" | while IFS= read -r line; do
-    print_message_line "$length" "$line"
+###############################################################################
+# Function: check_requirements
+# Checks if all required external commands are available.
+###############################################################################
+check_requirements() {
+  local missing=false
+  for cmd in "${REQUIRED_COMMANDS[@]}"; do
+    if ! command -v "$cmd" &>/dev/null; then
+      echo "Error: '$cmd' command is required but not found in PATH."
+      missing=true
+    fi
   done
-  print_empty_line "$length"
-  print_border "bottom" "$border_top"
+  if [ "$missing" = true ]; then
+    exit 1
+  fi
 }
 
-# Function to print the unicorn ASCII art
-unicorn_art() {
+###############################################################################
+# Function: usage
+# Prints usage information for this script.
+###############################################################################
+usage() {
+  cat <<EOF
+Usage: $0 [--above] "message"
+       echo "message" | $0 [--above]
+
+Options:
+  --above   Force the unicorn to be displayed below the message bubble, 
+            even if terminal width is sufficient for side-by-side.
+
+Description:
+  Prints a unicorn ASCII art along with a stylized speech bubble containing 
+  the provided message. The bubble is displayed side-by-side with the 
+  unicorn if the terminal width is large, or forced above if '--above' 
+  is specified or if the terminal is too narrow.
+EOF
+}
+
+###############################################################################
+# Function: unicorn_art_large
+# Prints the large unicorn ASCII art (suitable for bigger terminals).
+###############################################################################
+unicorn_art_large() {
   cat <<'EOF'
                 ,.. /        
               ,'   ';        
@@ -41,17 +70,10 @@ unicorn_art() {
 EOF
 }
 
-unicorn_art_small_right() {
-  cat <<'EOF'
-       \
-       _\,,
-      "-=\~     _
-         \\~___( ~
-        _|/---\\_
-        \        \
-EOF
-}
-
+###############################################################################
+# Function: unicorn_art_small_left
+# Prints a smaller unicorn ASCII art, aligned to the left.
+###############################################################################
 unicorn_art_small_left() {
   cat <<'EOF'
              /   
@@ -63,111 +85,248 @@ unicorn_art_small_left() {
 EOF
 }
 
-# Function to print borders for the message bubble
+###############################################################################
+# Function: unicorn_art_small_right
+# Prints a smaller unicorn ASCII art, aligned to the right (unused in
+# this script, but kept for completeness).
+###############################################################################
+unicorn_art_small_right() {
+  cat <<'EOF'
+       \
+       _\,,
+      "-=\~     _
+         \\~___( ~
+        _|/---\\_
+        \        \
+EOF
+}
+
+###############################################################################
+# Bubble Rendering Functions
+###############################################################################
+
+###############################################################################
+# Function: print_border
+# Prints the top or bottom border of the message bubble.
+# Arguments:
+#   $1 - "top" or "bottom"
+#   $2 - The string of repeated border characters (e.g., '─' x some length)
+###############################################################################
 print_border() {
-  local type="$1"
-  local border_top="$2"
-  if [ "$type" = "top" ]; then
-    echo "┌$border_top┐"
+  local border_type="$1"
+  local border_str="$2"
+  if [ "$border_type" = "top" ]; then
+    echo "┌${border_str}┐"
   else
-    echo "└$border_top┘"
+    echo "└${border_str}┘"
   fi
 }
 
-# Function to print an empty message line
+###############################################################################
+# Function: print_empty_line
+# Prints an empty (padding) line within the bubble.
+# Arguments:
+#   $1 - The width to fill
+###############################################################################
 print_empty_line() {
   local length="$1"
   printf "│   %-*s   │\n" "$length" ""
 }
 
-# Function to print a line inside the message bubble
+###############################################################################
+# Function: print_message_line
+# Prints a single line of the message within the bubble.
+# Arguments:
+#   $1 - The width of the bubble's content area
+#   $2 - The actual line to print
+###############################################################################
 print_message_line() {
   local length="$1"
   local line="$2"
   printf "│   %-*s   │\n" "$length" "$line"
 }
 
-# Function to handle printing logic
-print_message() {
+###############################################################################
+# Function: message_bubble
+# Creates the message bubble (string) for the given message and offset.
+# Arguments:
+#   $1 - The message to display
+#   $2 - Optional offset (indentation) for side-by-side alignment
+# Outputs:
+#   The entire bubble as multiple lines of text (via echo).
+###############################################################################
+message_bubble() {
   local message="$1"
-  local tcols=$(tput cols)
-  local trows=$(tput lines)
-  local unicorn=""
-  if [ "$trows" -lt 25 ]; then
-    unicorn=$(unicorn_art_small_left)
-  else
-    unicorn=$(unicorn_art)
-  fi
+  local offset="${2:-0}"
 
-  local unicorn_width=$(head -n 1 <<<"$unicorn" | wc -c)
+  # Replace tabs with spaces
+  message="${message//[$'\t']/    }"
 
-  if [ "$force_above" = true ] || [ "$tcols" -lt 60 ]; then
-    message_bubble "$message"
-    echo "$unicorn"
-  else
-    message=$(message_bubble "$message" $((unicorn_width)))
-    adjust_unicorn_spacing "$message" "$unicorn"
-  fi
+  # Terminal width and wrapping
+  local terminal_width
+  terminal_width=$(tput cols)
+  local wrap_width=$((terminal_width - 8 - offset))
+
+  # Safely fold message respecting words
+  local wrapped_message
+  wrapped_message=$(echo "$message" | fold -s -w "$wrap_width" | sed 's/[[:space:]]*$//')
+
+  # Determine the max line length to size the bubble
+  local length
+  length=$(echo "$wrapped_message" | awk '{ if (length($0) > max) max = length($0) } END { print max }')
+
+  # Build border line
+  local border_length=$((length + 6))
+  local border_chars
+  border_chars="$(printf '─%.0s' $(seq 1 "$border_length"))"
+
+  # Compose bubble
+  {
+    print_border "top" "$border_chars"
+    print_empty_line "$length"
+
+    while IFS= read -r line; do
+      print_message_line "$length" "$line"
+    done <<<"$wrapped_message"
+
+    print_empty_line "$length"
+    print_border "bottom" "$border_chars"
+  }
 }
 
-# Function to adjust unicorn spacing when printing side by side
+###############################################################################
+# Function: adjust_unicorn_spacing
+# Adjusts unicorn spacing when printing side-by-side with the message bubble.
+# Arguments:
+#   $1 - The bubble text (already generated string)
+#   $2 - The unicorn ASCII art (multi-line)
+# Outputs:
+#   The combined, side-by-side content.
+###############################################################################
 adjust_unicorn_spacing() {
-  local message="$1"
+  local bubble="$1"
   local unicorn="$2"
-  local unicorn_lines=$(echo "$unicorn" | wc -l)
-  local unicorn_width=$(head -n 1 <<<"$unicorn" | wc -c)
-  unicorn_width=$((unicorn_width - 1))
-  local spaces=$(printf '%*s' $unicorn_width '')
 
-  local line_number=0 new_lines=0
-  while IFS= read -r line; do
+  # Number of lines and width for the unicorn
+  local unicorn_lines
+  unicorn_lines=$(echo "$unicorn" | wc -l)
+  local unicorn_width
+  # Deduct 1 because wc -c counts the trailing newline in the first line
+  unicorn_width=$(($(head -n1 <<<"$unicorn" | wc -c) - 1))
+  local spaces
+  spaces=$(printf '%*s' "$unicorn_width" '')
+
+  # Count how many lines bubble has beyond the unicorn's lines
+  local line_number=0
+  local additional_lines=0
+
+  while IFS= read -r _; do
     line_number=$((line_number + 1))
-    if [ $line_number -gt $unicorn_lines ]; then
-      new_lines=$((new_lines + 1))
+    if [ "$line_number" -gt "$unicorn_lines" ]; then
+      additional_lines=$((additional_lines + 1))
     fi
-  done <<<"$message"
+  done <<<"$bubble"
 
-  local rounded_lines=$((new_lines / 2))
+  # Rough approach: add some empty lines in the unicorn to center it
+  local half_additional=$((additional_lines / 2))
+  for _ in $(seq 1 "$half_additional"); do
+    unicorn="${spaces}\n${unicorn}"
+    unicorn="${unicorn}\n${spaces}"
+  done
 
-  if [ $new_lines -gt 0 ]; then
-    for _ in $(seq 1 $rounded_lines); do
-      unicorn=$(printf "%s\n%s" "$spaces" "$unicorn")
-      unicorn=$(printf "%s\n%s" "$unicorn" "$spaces")
-    done
-  fi
-  unicorn=$(printf "%s\n%s" "$unicorn" "$spaces")
+  # Add a final line of spaces to avoid unmatched line counts
+  unicorn="${unicorn}\n${spaces}"
 
-  local combined_output=$(paste -d '' <(echo "$unicorn") <(echo "$message"))
-  echo "$combined_output"
+  # Use paste to combine line by line
+  paste -d '' <(printf "$unicorn") <(printf "$bubble")
 }
 
-# Parse arguments
-force_above=false
-input=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-  --above)
-    force_above=true
-    shift
-    ;;
-  *)
-    input="$1"
-    shift
-    ;;
-  esac
-done
+###############################################################################
+# Function: print_message_with_unicorn
+# Determines whether to print the unicorn side-by-side or above the bubble.
+# Arguments:
+#   $1 - The message to display
+#   $2 - Boolean flag "true" if forced above
+###############################################################################
+print_message_with_unicorn() {
+  local message="$1"
+  local force_above="$2"
 
-# Read input from pipe if available
-if [ -p /dev/stdin ]; then
-  input=$(cat)
-elif [ -z "$input" ]; then
-  echo "Usage: $0 [--above] \"message\" or echo 'message' | $0 [--above]"
-  exit 1
-fi
+  local terminal_cols
+  terminal_cols=$(tput cols)
+  local terminal_rows
+  terminal_rows=$(tput lines)
 
-# Convert ANSI escape sequences to plain text
-if command -v ansi2txt &>/dev/null; then
-  input=$(echo "$input" | ansi2txt)
-fi
+  local unicorn_art
 
-print_message "$input"
+  # Decide small or large unicorn
+  if [ "$terminal_rows" -lt 25 ]; then
+    unicorn_art="$(unicorn_art_small_left)"
+  else
+    unicorn_art="$(unicorn_art_large)"
+  fi
+
+  # If forced above or terminal too narrow, print bubble above
+  if [ "$force_above" = true ] || [ "$terminal_cols" -lt 60 ]; then
+    message_bubble "$message"
+    echo "$unicorn_art"
+  else
+    # For side-by-side
+    local unicorn_width
+    unicorn_width=$(($(head -n1 <<<"$unicorn_art" | wc -c) - 2))
+    # Generate the bubble text with offset
+    local bubble_text
+    bubble_text="$(message_bubble "$message" "$unicorn_width")"
+
+    # Combine side-by-side and print
+    adjust_unicorn_spacing "$bubble_text" "$unicorn_art"
+  fi
+}
+
+###############################################################################
+# Main: Parse arguments, handle input, print result.
+###############################################################################
+main() {
+  check_requirements
+
+  local force_above=false
+  local input_message=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --above)
+      force_above=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      input_message="$1"
+      shift
+      ;;
+    esac
+  done
+
+  # If there's data in stdin and no message in arguments
+  if [ -p /dev/stdin ] && [ -z "$input_message" ]; then
+    input_message="$(cat)"
+  fi
+
+  # If still no message, show usage
+  if [ -z "$input_message" ]; then
+    usage
+    exit 1
+  fi
+
+  # If ansi2txt is available, convert any ANSI escapes to plain text
+  if command -v ansi2txt &>/dev/null; then
+    input_message="$(echo "$input_message" | ansi2txt)"
+  fi
+
+  print_message_with_unicorn "$input_message" "$force_above"
+}
+
+# Run script
+main "$@"
