@@ -10,8 +10,7 @@
 # Constants / Configuration
 ###############################################################################
 
-# Adjust if needed for advanced usage
-REQUIRED_COMMANDS=("tput")
+REQUIRED_COMMANDS=("tput" "fold" "wc" "head" "printf" "cat" "seq" "command" "read" "echo")
 
 ###############################################################################
 # Function: check_requirements
