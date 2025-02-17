@@ -93,7 +93,7 @@ print_message() {
   local tcols=$(tput cols)
   local trows=$(tput lines)
   local unicorn=""
-  if [ "$trows" -lt 26 ]; then
+  if [ "$trows" -lt 25 ]; then
     unicorn=$(unicorn_art_small_left)
   else
     unicorn=$(unicorn_art)
@@ -105,7 +105,7 @@ print_message() {
     message_bubble "$message"
     echo "$unicorn"
   else
-    message=$(message_bubble "$message" $((unicorn_width - 1)))
+    message=$(message_bubble "$message" $((unicorn_width)))
     adjust_unicorn_spacing "$message" "$unicorn"
   fi
 }
@@ -138,9 +138,7 @@ adjust_unicorn_spacing() {
   unicorn=$(printf "%s\n%s" "$unicorn" "$spaces")
 
   local combined_output=$(paste -d '' <(echo "$unicorn") <(echo "$message"))
-  local combined_output_no_newlines=$(echo "$combined_output" | sed '1s/^ *//; $s/ *$//')
-  combined_output_no_newlines=$(printf "%s%s" "$spaces" "$combined_output_no_newlines") # Hack to fix spacing after sed
-  echo "$combined_output_no_newlines"
+  echo "$combined_output"
 }
 
 # Parse arguments
