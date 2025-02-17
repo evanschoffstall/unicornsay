@@ -1,35 +1,31 @@
 #!/bin/bash
 
+# Function to create a message bubble
 message_bubble() {
   local message="$1"
   local offset="${2:-0}"
-  local wrapped_message
-  local length
+  local wrapped_message length
 
-  # Get the terminal width
   local terminal_width=$(tput cols)
-  local wrap_width=$(((terminal_width - 7) - $offset)) # Adjust for padding
+  local wrap_width=$(((terminal_width - 7) - offset))
 
-  # Replace tabs with spaces
   message=$(echo "$message" | sed 's/\t/    /g')
-
-  # Wrap text at the terminal width, ensuring consistent spacing
   wrapped_message=$(echo "$message" | fold -s -w "$wrap_width" | sed 's/[[:space:]]*$//')
   length=$(echo "$wrapped_message" | awk '{if (length > max) max = length} END {print max}')
-  local border_length=$((length + 6)) # Padding for aesthetics
+  local border_length=$((length + 6))
   local border_top="$(printf '─%.0s' $(seq 1 $border_length))"
 
-  # Print message in table format
-  echo "┌$border_top┐"
-  printf "│   %-*s   │\n" "$length"
+  # Print message bubble
+  print_border "top" "$border_top"
+  print_empty_line "$length"
   echo "$wrapped_message" | while IFS= read -r line; do
-    printf "│   %-*s   │\n" "$length" "$line"
+    print_message_line "$length" "$line"
   done
-  printf "│   %-*s   │\n" "$length"
-  echo "└$border_top┘"
+  print_empty_line "$length"
+  print_border "bottom" "$border_top"
 }
 
-# Print the unicorn ASCII art
+# Function to print the unicorn ASCII art
 unicorn_art() {
   cat <<'EOF'
                 ,.. /        
@@ -45,49 +41,111 @@ unicorn_art() {
 EOF
 }
 
+unicorn_art_small_right() {
+  cat <<'EOF'
+       \
+       _\,,
+      "-=\~     _
+         \\~___( ~
+        _|/---\\_
+        \        \
+EOF
+}
+
+unicorn_art_small_left() {
+  cat <<'EOF'
+             /   
+          ,,/_   
+    _     ~/=-"  
+   ~ )___~//     
+   _//---\|_     
+  /        /     
+EOF
+}
+
+# Function to print borders for the message bubble
+print_border() {
+  local type="$1"
+  local border_top="$2"
+  if [ "$type" = "top" ]; then
+    echo "┌$border_top┐"
+  else
+    echo "└$border_top┘"
+  fi
+}
+
+# Function to print an empty message line
+print_empty_line() {
+  local length="$1"
+  printf "│   %-*s   │\n" "$length" ""
+}
+
+# Function to print a line inside the message bubble
+print_message_line() {
+  local length="$1"
+  local line="$2"
+  printf "│   %-*s   │\n" "$length" "$line"
+}
+
 # Function to handle printing logic
 print_message() {
   local message="$1"
   local tcols=$(tput cols)
-  local unicorn_art=$(unicorn_art)
+  local trows=$(tput lines)
+  local unicorn=""
+  if [ "$trows" -lt 26 ]; then
+    unicorn=$(unicorn_art_small_left)
+  else
+    unicorn=$(unicorn_art)
+  fi
+
+  local unicorn_width=$(head -n 1 <<<"$unicorn" | wc -c)
 
   if [ "$force_above" = true ] || [ "$tcols" -lt 60 ]; then
-    # Display message bubble above the unicorn
     message_bubble "$message"
-    unicorn_art
+    echo "$unicorn"
   else
-    # Display message bubble beside the unicorn
-    message=$(message_bubble "$message" 30)
-
-    # count how many lines after line 10
-    line_number=0
-    new_lines=0
-    while IFS= read -r line; do
-      line_number=$((line_number + 1))
-      if [ $line_number -gt 10 ]; then
-        new_lines=$((new_lines + 1))
-      fi
-    done <<<"$message"
-
-    rounded_lines=$((new_lines / 2))
-
-    # center the unicorn and keep the message bubble to the right
-    if [ $new_lines -gt 0 ]; then
-      for i in $(seq 1 $rounded_lines); do
-        unicorn_art=$(printf "                             \n$unicorn_art")
-        unicorn_art=$(printf "$unicorn_art\n                             ")
-      done
-    fi
-    unicorn_art=$(printf "$unicorn_art\n                             ")
-
-    paste -d '' <(echo "$unicorn_art") <(echo "$message")
+    message=$(message_bubble "$message" $((unicorn_width - 1)))
+    adjust_unicorn_spacing "$message" "$unicorn"
   fi
+}
+
+# Function to adjust unicorn spacing when printing side by side
+adjust_unicorn_spacing() {
+  local message="$1"
+  local unicorn="$2"
+  local unicorn_lines=$(echo "$unicorn" | wc -l)
+  local unicorn_width=$(head -n 1 <<<"$unicorn" | wc -c)
+  unicorn_width=$((unicorn_width - 1))
+  local spaces=$(printf '%*s' $unicorn_width '')
+
+  local line_number=0 new_lines=0
+  while IFS= read -r line; do
+    line_number=$((line_number + 1))
+    if [ $line_number -gt $unicorn_lines ]; then
+      new_lines=$((new_lines + 1))
+    fi
+  done <<<"$message"
+
+  local rounded_lines=$((new_lines / 2))
+
+  if [ $new_lines -gt 0 ]; then
+    for _ in $(seq 1 $rounded_lines); do
+      unicorn=$(printf "%s\n%s" "$spaces" "$unicorn")
+      unicorn=$(printf "%s\n%s" "$unicorn" "$spaces")
+    done
+  fi
+  unicorn=$(printf "%s\n%s" "$unicorn" "$spaces")
+
+  local combined_output=$(paste -d '' <(echo "$unicorn") <(echo "$message"))
+  local combined_output_no_newlines=$(echo "$combined_output" | sed '1s/^ *//; $s/ *$//')
+  combined_output_no_newlines=$(printf "%s%s" "$spaces" "$combined_output_no_newlines") # Hack to fix spacing after sed
+  echo "$combined_output_no_newlines"
 }
 
 # Parse arguments
 force_above=false
 input=""
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --above)
