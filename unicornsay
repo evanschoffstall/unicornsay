@@ -51,6 +51,22 @@ EOF
 }
 
 ###############################################################################
+# Function: get_width
+# Returns the width of the first line of the input text.
+###############################################################################
+get_width() {
+  echo "$(head -n1 <<<"$@" | wc -c)"
+}
+
+###############################################################################
+# Function: get_height
+# Returns the height of the input text.
+###############################################################################
+get_height() {
+  echo "$@" | wc -l
+}
+
+###############################################################################
 # Function: unicorn_art_large
 # Prints the large unicorn ASCII art (suitable for bigger terminals).
 ###############################################################################
@@ -192,7 +208,6 @@ message_bubble() {
 
 ###############################################################################
 # Function: adjust_unicorn_spacing
-# Remove external commands (wc, head, paste), handle spacing in pure Bash
 # Arguments:
 #   $1 - The bubble text (already generated string)
 #   $2 - The unicorn ASCII art (multi-line)
@@ -249,12 +264,11 @@ print_message_with_unicorn() {
   terminal_rows=$(tput lines)
 
   local unicorn_art
-
   # Decide small or large unicorn
-  if [ "$terminal_rows" -lt 25 ]; then
-    unicorn_art="$(unicorn_art_small_left)"
-  else
+  if [ "$terminal_rows" -gt "$(get_height "$(unicorn_art_large)")" ]; then
     unicorn_art="$(unicorn_art_large)"
+  else
+    unicorn_art="$(unicorn_art_small_left)"
   fi
 
   # If forced above or terminal too narrow, print bubble above
@@ -264,7 +278,7 @@ print_message_with_unicorn() {
   else
     # For side-by-side
     local unicorn_width
-    unicorn_width=$(($(head -n1 <<<"$unicorn_art" | wc -c) - 2))
+    unicorn_width="$(($(get_width "$unicorn_art") - 2))"
     # Generate the bubble text with offset
     local bubble_text
     bubble_text="$(message_bubble "$message" "$unicorn_width")"
