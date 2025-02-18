@@ -393,8 +393,8 @@ main() {
   check_requirements
 
   local force_above=false
-  local art_size="" # Could be "big" or "small" if user specified
-  local side="left" # Default side
+  local art_size="big" # Could be "big" or "small" if user specified
+  local side="left"    # Default side
 
   local input_message=""
 
