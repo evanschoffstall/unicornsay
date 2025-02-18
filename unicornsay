@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Unicorn Chat
+# Unicornsay
 # Prints a message inside a bubble next to (or above) a unicorn ASCII art.
 # Usage:
-#   ./unicorn_chat.sh [--above] "Your message here"
-#   echo "Your message here" | ./unicorn_chat.sh [--above]
+#   ./unicornsay [--above] [--art=big|small] [--side=left|right] "Your message here"
+#   echo "Your message here" | ./unicornsay [--above] [--art=big|small] [--side=left|right]
 
 ###############################################################################
 # Constants / Configuration
@@ -35,18 +35,22 @@ check_requirements() {
 ###############################################################################
 usage() {
   cat <<EOF
-Usage: $0 [--above] "message"
-       echo "message" | $0 [--above]
+Usage: $0 [--above] [--art=big|small] [--side=left|right] "message"
+       echo "message" | $0 [--above] [--art=big|small] [--side=left|right]
 
 Options:
-  --above   Force the unicorn to be displayed below the message bubble, 
-            even if terminal width is sufficient for side-by-side.
+  --above               Force the unicorn to be displayed below the message bubble,
+                        even if terminal width is sufficient for side-by-side.
+  --art=big|small       Force the script to use the large or small unicorn ASCII art.
+                        (If not specified, the script decides based on terminal height.)
+  --side=left|right     Place the unicorn on the left or right side when side-by-side.
+                        (If not specified, unicorn defaults to the left side.)
 
 Description:
-  Prints a unicorn ASCII art along with a stylized speech bubble containing 
-  the provided message. The bubble is displayed side-by-side with the 
-  unicorn if the terminal width is large, or forced above if '--above' 
-  is specified or if the terminal is too narrow.
+  Prints a unicorn ASCII art along with a stylized speech bubble containing
+  the provided message. The bubble is displayed side-by-side with the
+  unicorn if the terminal width is large (or if not forced above),
+  or placed above if '--above' is specified or if the terminal is too narrow.
 EOF
 }
 
@@ -72,35 +76,36 @@ get_height() {
 ###############################################################################
 unicorn_art_large_left() {
   cat <<'EOF'
-                ,.. /      
-              ,'   ';      
-   ,,.__    _,' /';  .     
-  :','  ~~~~    '. '`      
-  :' (   )         )::,    
-  '. '. .=----=..-~  .;'   
-   '  ;'  ::   ':.  '      
-     (:   ':    ;)         
-      \   '"  ./           
-       '"      '"          
+                ,.. /    
+              ,'   ';    
+   ,,.__    _,' /';  .   
+  :','  ~~~~    '. '`    
+  :' (   )         )::,  
+  '. '. .=----=..-~  .;' 
+   '  ;'  ::   ':.  '    
+     (:   ':    ;)       
+      \   '"  ./         
+       '"      '"        
 EOF
 }
 
 ###############################################################################
 # Function: unicorn_art_large_right
-# Prints the large unicorn ASCII art (suitable for bigger terminals).
+# Prints the large unicorn ASCII art (suitable for bigger terminals),
+# aligned to the right side.
 ###############################################################################
 unicorn_art_large_right() {
   cat <<'EOF'
-  \ ..,
-  ;'   ',
-  .  ;'\ ',_    __.,,
-  `' .'     ~~~~  ',':
-  ,::(         (   ) ':
- ';.  ~-..=----=. .' .'
-    '  .:'   ::  ';  '
-       (;    :'   :)
-         \.  "'   /
-        "'      "'     
+   \ ..,                 
+   ;'   ',               
+   .  ;'\ ',_    __.,,   
+   `' .'     ~~~~  ',':  
+   ,::(         (   ) ': 
+  ';.  ~-..=----=. .' .' 
+     '  .:'   ::  ';  '  
+        (;    :'   :)    
+          \.  "'   /     
+         "'      "'      
 EOF
 }
 
@@ -121,17 +126,16 @@ EOF
 
 ###############################################################################
 # Function: unicorn_art_small_right
-# Prints a smaller unicorn ASCII art, aligned to the right (unused in
-# this script, but kept for completeness).
+# Prints a smaller unicorn ASCII art, aligned to the right.
 ###############################################################################
 unicorn_art_small_right() {
   cat <<'EOF'
-       \
-       _\,,
-      "-=\~     _
-         \\~___( ~
-        _|/---\\_
-        \        \
+   \             
+   _\,,          
+  "-=\~     _    
+     \\~___( ~   
+      _|/---\\_  
+      \        \ 
 EOF
 }
 
@@ -226,84 +230,159 @@ message_bubble() {
 }
 
 ###############################################################################
-# Function: adjust_unicorn_spacing
+# Function: adjust_unicorn_spacing_side_by_side
+# Places two blocks of text side-by-side: blockA + blockB.
+#   - If side="left", blockA is the unicorn, blockB is the bubble.
+#   - If side="right", blockA is the bubble,  blockB is the unicorn.
 # Arguments:
-#   $1 - The bubble text (already generated string)
-#   $2 - The unicorn ASCII art (multi-line)
-# Outputs:
-#   The combined, side-by-side content.
+#   $1 - The first block (multi-line string)
+#   $2 - The second block (multi-line string)
 ###############################################################################
-adjust_unicorn_spacing() {
-  local bubble="$1"
-  local unicorn="$2"
-  IFS=$'\n' read -rd '' -a bubble_lines <<<"$bubble"
-  IFS=$'\n' read -rd '' -a unicorn_lines <<<"$unicorn"
+adjust_unicorn_spacing_side_by_side() {
+  local blockA="$1"
+  local blockB="$2"
 
-  # Calculate max width of the first line of unicorn
-  local first_line="${unicorn_lines[0]}"
-  local unicorn_width=${#first_line}
-  local spaces
-  spaces="$(printf '%*s' "$unicorn_width" '')"
+  IFS=$'\n' read -rd '' -a linesA <<<"$blockA"
+  IFS=$'\n' read -rd '' -a linesB <<<"$blockB"
 
-  # Determine bubble vs unicorn line counts
-  local bubble_count=${#bubble_lines[@]}
-  local unicorn_count=${#unicorn_lines[@]}
-  local additional_lines=$((bubble_count - unicorn_count))
-  ((additional_lines < 0)) && additional_lines=0
-  local half_additional=$((additional_lines / 2))
-
-  # Pad unicorn top/bottom lines
-  for _ in $(seq 1 "$half_additional"); do
-    unicorn_lines=("$spaces" "${unicorn_lines[@]}" "$spaces")
+  # Find the widest line in blockA
+  local widestA=0
+  for line in "${linesA[@]}"; do
+    ((${#line} > widestA)) && widestA=${#line}
   done
-  unicorn_lines+=("$spaces")
 
-  # Merge line by line
-  local max_count=$((bubble_count > unicorn_count ? bubble_count : unicorn_count))
-  for ((i = 0; i < max_count; i++)); do
-    echo -n "${unicorn_lines[i]:-$spaces}"
-    echo "${bubble_lines[i]:-}"
+  # We'll combine lines side by side. If one block is taller, we pad the other.
+  local maxCount=$((${#linesA[@]} > ${#linesB[@]} ? ${#linesA[@]} : ${#linesB[@]}))
+
+  # Pad the shorter block to align the unicorn art at the bottom
+  if [ ${#linesA[@]} -lt ${#linesB[@]} ]; then
+    local padding=$((${#linesB[@]} - ${#linesA[@]}))
+    for ((i = 0; i < padding; i++)); do
+      linesA=("" "${linesA[@]}")
+    done
+  else
+    local padding=$((${#linesA[@]} - ${#linesB[@]}))
+    for ((i = 0; i < padding; i++)); do
+      linesB=("" "${linesB[@]}")
+    done
+  fi
+
+  for ((i = 0; i < maxCount; i++)); do
+    local leftLine="${linesA[i]:-}"
+    local rightLine="${linesB[i]:-}"
+    # Print leftLine, then some spacing, then rightLine
+    printf "%-*s%s\n" "$widestA" "$leftLine" "$rightLine"
   done
 }
 
 ###############################################################################
+# Function: print_side_by_side
+# Prints the message bubble and unicorn art side-by-side.
+# Arguments:
+#   $1 - The message to display
+#   $2 - The unicorn art
+#   $3 - The side ("left" or "right")
+###############################################################################
+print_side_by_side() {
+  local message="$1"
+  local unicorn_art="$2"
+  local side="$3"
+
+  local bubble_text
+  local widest_unicorn_line
+  widest_unicorn_line="$(head -n1 <<<"$unicorn_art")"
+  local unicorn_width=${#widest_unicorn_line}
+  bubble_text="$(message_bubble "$message" "$unicorn_width")"
+
+  if [ "$side" = "right" ]; then
+    adjust_unicorn_spacing_side_by_side "$bubble_text" "$unicorn_art"
+  else
+    adjust_unicorn_spacing_side_by_side "$unicorn_art" "$bubble_text"
+  fi
+}
+
+###############################################################################
+# Function: get_unicorn_art
+# Returns the appropriate unicorn ASCII art based on size and side.
+# Arguments:
+#   $1 - The art size ("big" or "small")
+#   $2 - The side ("left" or "right")
+###############################################################################
+get_unicorn_art() {
+  local art_size="$1"
+  local side="$2"
+
+  if [ "$art_size" = "big" ]; then
+    if [ "$side" = "right" ]; then
+      unicorn_art_large_right
+    else
+      unicorn_art_large_left
+    fi
+  else
+    if [ "$side" = "right" ]; then
+      unicorn_art_small_right
+    else
+      unicorn_art_small_left
+    fi
+  fi
+}
+
+################fi##############################################################
+# Function: print_above
+# Prints the message bubble above the unicorn art.
+# Arguments:
+#   $1 - The message to display
+#   $2 - The unicorn art
+#   $3 - The side ("left" or "right")
+###############################################################################
+print_above() {
+  local message="$1"
+  local unicorn_art="$2"
+  local side="$3"
+
+  message_bubble "$message"
+
+  if [ "$side" = "right" ]; then
+    local terminal_width
+    terminal_width=$(tput cols)
+    while IFS= read -r line; do
+      printf "%*s\n" "$terminal_width" "$line"
+    done <<<"$unicorn_art"
+  else
+    echo "$unicorn_art"
+  fi
+}
+
+###############################################################################
 # Function: print_message_with_unicorn
-# Determines whether to print the unicorn side-by-side or above the bubble.
+# Determines whether to print the unicorn side-by-side or above the bubble,
+# and which art size/side to use.
 # Arguments:
 #   $1 - The message to display
 #   $2 - Boolean flag "true" if forced above
+#   $3 - The forced art size (big/small) if specified, else empty
+#   $4 - The forced side (left/right) if specified, else "left"
 ###############################################################################
 print_message_with_unicorn() {
   local message="$1"
   local force_above="$2"
+  local art_size="$3"
+  local side="$4"
 
   local terminal_cols
   terminal_cols=$(tput cols)
   local terminal_rows
   terminal_rows=$(tput lines)
 
+  # Determine which unicorn art to use
   local unicorn_art
-  # Decide small or large unicorn
-  if [ "$terminal_rows" -gt "$(get_height "$(unicorn_art_large_left)")" ]; then
-    unicorn_art="$(unicorn_art_large_left)"
-  else
-    unicorn_art="$(unicorn_art_small_left)"
-  fi
+  unicorn_art="$(get_unicorn_art "$art_size" "$side")"
 
-  # If forced above or terminal too narrow, print bubble above
+  # Decide whether to print side-by-side or above
   if [ "$force_above" = true ] || [ "$terminal_cols" -lt 60 ]; then
-    message_bubble "$message"
-    echo "$unicorn_art"
+    print_above "$message" "$unicorn_art" "$side"
   else
-    # For side-by-side
-    local unicorn_width
-    unicorn_width="$(($(get_width "$unicorn_art") - 2))"
-    # Generate the bubble text with offset
-    local bubble_text
-    bubble_text="$(message_bubble "$message" "$unicorn_width")"
-
-    # Combine side-by-side and print
-    adjust_unicorn_spacing "$bubble_text" "$unicorn_art"
+    print_side_by_side "$message" "$unicorn_art" "$side"
   fi
 }
 
@@ -314,6 +393,9 @@ main() {
   check_requirements
 
   local force_above=false
+  local art_size="" # Could be "big" or "small" if user specified
+  local side="left" # Default side
+
   local input_message=""
 
   while [[ $# -gt 0 ]]; do
@@ -322,11 +404,30 @@ main() {
       force_above=true
       shift
       ;;
+    --art=*)
+      art_size="${1#*=}"
+      # Validate it (optional: you can skip)
+      if [[ "$art_size" != "big" && "$art_size" != "small" ]]; then
+        echo "Error: --art must be 'big' or 'small'."
+        exit 1
+      fi
+      shift
+      ;;
+    --side=*)
+      side="${1#*=}"
+      # Validate it (optional: you can skip)
+      if [[ "$side" != "left" && "$side" != "right" ]]; then
+        echo "Error: --side must be 'left' or 'right'."
+        exit 1
+      fi
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
       ;;
     *)
+      # If it's not an option, treat it as part of the message
       input_message="$1"
       shift
       ;;
@@ -349,7 +450,7 @@ main() {
     input_message="$(echo "$input_message" | ansi2txt)"
   fi
 
-  print_message_with_unicorn "$input_message" "$force_above"
+  print_message_with_unicorn "$input_message" "$force_above" "$art_size" "$side"
 }
 
 # Run script
