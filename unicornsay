@@ -7,29 +7,6 @@
 #   echo "Your message here" | ./unicornsay [--above] [--art=big|small] [--side=left|right]
 
 ###############################################################################
-# Constants / Configuration
-###############################################################################
-
-REQUIRED_COMMANDS=("tput" "fold" "wc" "head" "printf" "cat" "seq" "command" "read" "echo")
-
-###############################################################################
-# Function: check_requirements
-# Checks if all required external commands are available.
-###############################################################################
-check_requirements() {
-  local missing=false
-  for cmd in "${REQUIRED_COMMANDS[@]}"; do
-    if ! command -v "$cmd" &>/dev/null; then
-      echo "Error: '$cmd' command is required but not found in PATH."
-      missing=true
-    fi
-  done
-  if [ "$missing" = true ]; then
-    exit 1
-  fi
-}
-
-###############################################################################
 # Function: usage
 # Prints usage information for this script.
 ###############################################################################
@@ -59,7 +36,8 @@ EOF
 # Returns the width of the first line of the input text.
 ###############################################################################
 get_width() {
-  echo "$(head -n1 <<<"$@" | wc -c)"
+  local first_line="${1%%$'\n'*}"
+  echo "${#first_line}"
 }
 
 ###############################################################################
@@ -67,7 +45,14 @@ get_width() {
 # Returns the height of the input text.
 ###############################################################################
 get_height() {
-  echo "$@" | wc -l
+  local count=0
+  local text="$1"
+  while [[ "$text" == *$'\n'* ]]; do
+    text="${text#*$'\n'}"
+    ((count++))
+  done
+  [ -n "$text" ] && ((count++))
+  echo "$count"
 }
 
 ###############################################################################
@@ -196,34 +181,66 @@ message_bubble() {
   local message="$1"
   local offset="${2:-0}"
   local terminal_width
-  terminal_width=$(tput cols)
+  terminal_width=$(tput cols 2>/dev/null || echo 80)
 
   # Calculate wrap width
   local wrap_width=$((terminal_width - 9 - offset))
   [ $wrap_width -lt 1 ] && wrap_width=1
 
-  # Use fold for word wrapping
-  local wrapped_message
-  wrapped_message=$(echo "$message" | fold -s -w $wrap_width)
+  # Manual word wrapping for better performance, preserving existing line breaks
+  local wrapped_message=""
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ -z "$line" ]; then
+      # Empty line, preserve it
+      wrapped_message="$wrapped_message"$'\n'
+      continue
+    fi
+    
+    # Process each line individually for word wrapping
+    local current_line=""
+    local words
+    read -ra words <<< "$line"
+    
+    for word in "${words[@]}"; do
+      if [ ${#current_line} -eq 0 ]; then
+        current_line="$word"
+      elif [ $((${#current_line} + 1 + ${#word})) -le $wrap_width ]; then
+        current_line="$current_line $word"
+      else
+        wrapped_message="$wrapped_message$current_line"$'\n'
+        current_line="$word"
+      fi
+    done
+    [ -n "$current_line" ] && wrapped_message="$wrapped_message$current_line"$'\n'
+  done <<< "$message"
+  
+  # Remove the trailing newline if present
+  wrapped_message="${wrapped_message%$'\n'}"
 
   # Find max line length in one pass
   local length=0
-  while IFS= read -r wrapped_line; do
-    ((${#wrapped_line} > length)) && length=${#wrapped_line}
-  done <<<"$wrapped_message"
+  local line
+  while IFS= read -r line; do
+    ((${#line} > length)) && length=${#line}
+  done <<< "$wrapped_message"
 
-  # Build border line
+  # Build border line using string multiplication
   local border_length=$((length + 6))
-  local border_chars
-  border_chars="$(printf '─%.0s' $(seq 1 "$border_length"))"
+  local border_chars=""
+  local i=0
+  while [ $i -lt $border_length ]; do
+    border_chars="${border_chars}─"
+    ((i++))
+  done
 
   # Compose bubble
   {
     echo "┌${border_chars}┐"
     printf "│   %-*s   │\n" "$length" ""
-    while IFS= read -r wm; do
-      printf "│   %-*s   │\n" "$length" "$wm"
-    done <<<"$wrapped_message"
+    while IFS= read -r line; do
+      printf "│   %-*s   │\n" "$length" "$line"
+    done <<< "$wrapped_message"
     printf "│   %-*s   │\n" "$length" ""
     echo "└${border_chars}┘"
   }
@@ -242,8 +259,16 @@ adjust_unicorn_spacing_side_by_side() {
   local blockA="$1"
   local blockB="$2"
 
-  IFS=$'\n' read -rd '' -a linesA <<<"$blockA"
-  IFS=$'\n' read -rd '' -a linesB <<<"$blockB"
+  # Convert blocks to arrays more efficiently
+  local -a linesA linesB
+  local line
+  while IFS= read -r line; do
+    linesA+=("$line")
+  done <<< "$blockA"
+  
+  while IFS= read -r line; do
+    linesB+=("$line")
+  done <<< "$blockB"
 
   # Find the widest line in blockA
   local widestA=0
@@ -257,14 +282,26 @@ adjust_unicorn_spacing_side_by_side() {
   # Pad the shorter block to align the unicorn art at the bottom
   if [ ${#linesA[@]} -lt ${#linesB[@]} ]; then
     local padding=$((${#linesB[@]} - ${#linesA[@]}))
+    local -a temp_array
+    local i
     for ((i = 0; i < padding; i++)); do
-      linesA=("" "${linesA[@]}")
+      temp_array+=("")
     done
+    for line in "${linesA[@]}"; do
+      temp_array+=("$line")
+    done
+    linesA=("${temp_array[@]}")
   else
     local padding=$((${#linesA[@]} - ${#linesB[@]}))
+    local -a temp_array
+    local i
     for ((i = 0; i < padding; i++)); do
-      linesB=("" "${linesB[@]}")
+      temp_array+=("")
     done
+    for line in "${linesB[@]}"; do
+      temp_array+=("$line")
+    done
+    linesB=("${temp_array[@]}")
   fi
 
   for ((i = 0; i < maxCount; i++)); do
@@ -370,9 +407,18 @@ print_message_with_unicorn() {
   local side="$4"
 
   local terminal_cols
-  terminal_cols=$(tput cols)
-  local terminal_rows
-  terminal_rows=$(tput lines)
+  terminal_cols=$(tput cols 2>/dev/null || echo 80)
+  
+  # Auto-determine art size if not specified
+  if [ -z "$art_size" ]; then
+    local terminal_rows
+    terminal_rows=$(tput lines 2>/dev/null || echo 24)
+    if [ "$terminal_rows" -lt 15 ]; then
+      art_size="small"
+    else
+      art_size="big"
+    fi
+  fi
 
   # Determine which unicorn art to use
   local unicorn_art
@@ -390,10 +436,8 @@ print_message_with_unicorn() {
 # Main: Parse arguments, handle input, print result.
 ###############################################################################
 main() {
-  check_requirements
-
   local force_above=false
-  local art_size="big" # Could be "big" or "small" if user specified
+  local art_size="" # Could be "big" or "small" if user specified
   local side="left"    # Default side
 
   local input_message=""
@@ -446,9 +490,10 @@ main() {
   fi
 
   # If ansi2txt is available, convert any ANSI escapes to plain text
-  if command -v ansi2txt &>/dev/null; then
-    input_message="$(echo "$input_message" | ansi2txt)"
-  fi
+  # Commented out for performance - uncomment if ANSI stripping is needed
+  #if command -v ansi2txt &>/dev/null; then
+  #   input_message="$(echo "$input_message" | ansi2txt)"
+  # fi
 
   print_message_with_unicorn "$input_message" "$force_above" "$art_size" "$side"
 }
