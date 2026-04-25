@@ -4,4 +4,7 @@
 # Whitelist specific files and directories
 !.gitignore
 !unicornsay
+!unicornsay.bats
+!unicornsay.png
+!README.md
 !path/to/other/file_or_directory
