@@ -45,10 +45,11 @@ Side-by-side layout requires at least 60 columns. Set `COLUMNS` and `LINES` to p
 ## Tests
 
 ```bash
-bats unicornsay.bats
+bun install
+bun run test
 ```
 
-Covers all 20 combinations of `--above`, `--art`, and `--side` with exact-output assertions at `COLUMNS=80 LINES=24`. Uses [bats-core](https://github.com/bats-core/bats-core).
+Covers all 20 combinations of `--above`, `--art`, and `--side` with exact-output assertions at `COLUMNS=80 LINES=24`. BATS is installed as a local dev dependency and run through the package script.
 
 > [!IMPORTANT]
 > If you change the output layout, re-capture snapshots at `COLUMNS=80 LINES=24` and update the heredocs in `unicornsay.bats`.

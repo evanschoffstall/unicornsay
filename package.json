@@ -20,6 +20,7 @@
     "@semantic-release/github": "latest",
     "@semantic-release/npm": "latest",
     "@semantic-release/release-notes-generator": "latest",
+    "bats": "^1.13.0",
     "conventional-changelog-conventionalcommits": "latest",
     "semantic-release": "latest"
   }
