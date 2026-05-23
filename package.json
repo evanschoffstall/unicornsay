@@ -1,0 +1,26 @@
+{
+  "name": "unicornsay",
+  "version": "1.0.0",
+  "description": "Say something. A unicorn will deliver it.",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:evanschoffstall/unicornsay.git"
+  },
+  "bin": {
+    "unicornsay": "./unicornsay"
+  },
+  "scripts": {
+    "test": "bats unicornsay.bats"
+  },
+  "devDependencies": {
+    "@semantic-release/commit-analyzer": "latest",
+    "@semantic-release/git": "latest",
+    "@semantic-release/github": "latest",
+    "@semantic-release/npm": "latest",
+    "@semantic-release/release-notes-generator": "latest",
+    "conventional-changelog-conventionalcommits": "latest",
+    "semantic-release": "latest"
+  }
+}
