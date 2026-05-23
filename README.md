@@ -2,7 +2,7 @@
 
 <br />
 
-<img src="./logo.png" width="112" height="112" alt="logo" />
+<img src="./logo.png" width="220" alt="logo" />
 
 # unicornsay
 
