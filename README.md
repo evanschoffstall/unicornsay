@@ -2,7 +2,7 @@
 
 <br />
 
-<img src="./unicornsay.png" width="1026" alt="unicornsay banner" />
+<img src="./logo.png" width="112" height="112" alt="logo" />
 
 # unicornsay
 
@@ -16,11 +16,7 @@ _Say something. A unicorn will deliver it._
 
 A single-file Bash script that wraps any message in a styled speech bubble beside a unicorn. Reads from an argument or stdin. Pipe anything through it.
 
-## Install
-
-```bash
-cp unicornsay ~/.local/bin/unicornsay && chmod +x ~/.local/bin/unicornsay
-```
+<img src="./unicornsay.png" width="1026" alt="unicornsay banner" />
 
 ## Usage
 
@@ -35,17 +31,14 @@ echo "Build passed." | unicornsay
 unicornsay "$(date "+%b %e, %Y %I:%M:%S %p"; echo; fortune)" | lolcat
 ```
 
-> [!TIP]
-> Add the `fortune | lolcat` line to your `.zshrc` or `.bashrc` for a colorful greeting every time you open a terminal.
-
 ## Options
 
-| Flag           | Values          | Default | Description                                           |
-| -------------- | --------------- | ------- | ----------------------------------------------------- |
-| `--above`      | —               | off     | Bubble above the unicorn instead of side-by-side.     |
-| `--art`        | `big`, `small`  | auto    | Art size. Auto-selected from terminal height.         |
-| `--side`       | `left`, `right` | `left`  | Which side the unicorn appears on.                    |
-| `-h`, `--help` | —               | —       | Print usage and exit.                                 |
+| Flag           | Values          | Default | Description                                       |
+| -------------- | --------------- | ------- | ------------------------------------------------- |
+| `--above`      | —               | off     | Bubble above the unicorn instead of side-by-side. |
+| `--art`        | `big`, `small`  | auto    | Art size. Auto-selected from terminal height.     |
+| `--side`       | `left`, `right` | `left`  | Which side the unicorn appears on.                |
+| `-h`, `--help` | —               | —       | Print usage and exit.                             |
 
 Side-by-side layout requires at least 60 columns. Set `COLUMNS` and `LINES` to pin layout for scripts and CI.
 
@@ -60,9 +53,7 @@ Covers all 20 combinations of `--above`, `--art`, and `--side` with exact-output
 > [!IMPORTANT]
 > If you change the output layout, re-capture snapshots at `COLUMNS=80 LINES=24` and update the heredocs in `unicornsay.bats`.
 
-## License
-
-Released under the [MIT License](LICENSE).
+#
 
 <div align="center">
 
